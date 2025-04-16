@@ -13,17 +13,20 @@ import (
 )
 
 var l = logrus.New()
+var location *time.Location = time.Local
 
 var config Config
 
 type Config struct {
-	saveLogs string
-	logLevel string
+	save     string
+	level    string
+	timezone string
 }
 
 func init() {
-	config.saveLogs = os.Getenv("SAVE_LOGS")
-	config.logLevel = os.Getenv("LOG_LEVEL")
+	config.save = os.Getenv("LOG_SAVE")
+	config.level = os.Getenv("LOG_LEVEL")
+	config.timezone = os.Getenv("LOG_TIMEZONE")
 
 	// Colorful output for console
 	l.Out = colorable.NewColorableStdout()
@@ -38,8 +41,18 @@ func init() {
 	})
 
 	// Add hook for saving logs to daily files without colors
-	if config.saveLogs == "true" {
+	if config.save == "true" {
 		l.AddHook(newDailyFileHook())
+	}
+
+	// Set timezone for log timestamps
+	if config.timezone != "" {
+		loc, err := time.LoadLocation(config.timezone)
+		if err != nil {
+			l.Warnf("Invalid LOG_TIMEZONE: %s. Falling back to local time.", err)
+		} else {
+			location = loc
+		}
 	}
 
 	markHealthy()
@@ -47,7 +60,7 @@ func init() {
 
 // setLogLevel sets the logging level based on the LOG_LEVEL environment variable.
 func setLogLevel() {
-	switch config.logLevel {
+	switch config.level {
 	case "debug":
 		l.SetLevel(logrus.DebugLevel)
 	case "info":
@@ -95,7 +108,7 @@ func (f *customFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 
 	formattedMessage := fmt.Sprintf("%s | %s | %s\n",
-		entry.Time.Format(f.TimestampFormat),
+		entry.Time.In(location).Format(f.TimestampFormat),
 		levelText,
 		entry.Message)
 	return []byte(formattedMessage), nil
@@ -144,7 +157,7 @@ func (hook *dailyFileHook) Fire(entry *logrus.Entry) error {
 
 // ensureLogFile ensures that the log file for the current day is open.
 func (hook *dailyFileHook) ensureLogFile() {
-	now := time.Now()
+	now := time.Now().In(location)
 	fileName := filepath.Join(hook.basePath, now.Format("2006-01-02")+".log")
 
 	// Check if the file is already open and is current
