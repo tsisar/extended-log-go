@@ -42,6 +42,7 @@ This package relies on the following external libraries:
 
 - [logrus](https://github.com/sirupsen/logrus): For structured logging.
 - [ginkgo](https://github.com/onsi/ginkgo): For color support in logs.
+- tzdata in target image: For timezone data.
 
 ## License
 

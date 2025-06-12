@@ -12,6 +12,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TODO Log directory
+// TODO period for log rotation
+// TODO use native go logger
+
 var l = logrus.New()
 var location *time.Location = time.Local
 
@@ -54,8 +58,6 @@ func init() {
 			location = loc
 		}
 	}
-
-	markHealthy()
 }
 
 // setLogLevel sets the logging level based on the LOG_LEVEL environment variable.
@@ -190,13 +192,11 @@ func removeColorCodes(line []byte) []byte {
 
 // Fatal logs a fatal message and exits the program.
 func Fatal(msg string) {
-	markUnhealthy()
 	l.Fatal(msg)
 }
 
 // Fatalf logs a formatted fatal message and exits the program.
 func Fatalf(format string, args ...interface{}) {
-	markUnhealthy()
 	l.Fatalf(format, args...)
 }
 
@@ -245,22 +245,22 @@ func Debugf(format string, args ...interface{}) {
 	l.Debugf(format, args...)
 }
 
-// markHealthy creates a /tmp/healthy file to indicate that the application is healthy.
-func markHealthy() {
-	_, err := os.Create("/tmp/healthy")
-	if err != nil {
-		Errorf("Error creating /tmp/healthy file: %s", err)
-	} else {
-		Info("The /tmp/healthy file was successfully created.")
-	}
+// Println logs a message with a newline character.
+func Println(args ...interface{}) {
+	l.Println(args...)
 }
 
-// markUnhealthy removes the /tmp/healthy file to indicate that the application is unhealthy.
-func markUnhealthy() {
-	err := os.Remove("/tmp/healthy")
-	if err != nil {
-		Errorf("Error removing /tmp/healthy file: %s", err)
-	} else {
-		Info("The /tmp/healthy file was successfully removed.")
-	}
+// Printf logs a formatted message.
+func Printf(format string, args ...interface{}) {
+	l.Printf(format, args...)
+}
+
+// Trace logs a trace message.
+func Trace(msg string) {
+	l.Trace(msg)
+}
+
+// Tracef logs a formatted trace message.
+func Tracef(format string, args ...interface{}) {
+	l.Tracef(format, args...)
 }
