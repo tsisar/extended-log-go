@@ -13,7 +13,7 @@ A lightweight logging package for Go projects, built on top of `logrus` for adva
 Install the package and its dependencies:
 
 ```shell
-go get github.com/Tsisar/extended-log-go@v1.0.0
+go get github.com/tsisar/extended-log-go@v1.0.0
 ```
 
 ## Usage
@@ -24,7 +24,7 @@ Basic Logging Example
 package main
 
 import (
-	"github.com/Tsisar/extended-log-go/log"
+	"github.com/tsisar/extended-log-go/log"
 )
 
 func main() {
