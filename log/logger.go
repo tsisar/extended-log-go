@@ -63,6 +63,8 @@ func init() {
 // setLogLevel sets the logging level based on the LOG_LEVEL environment variable.
 func setLogLevel() {
 	switch config.level {
+	case "trace":
+		l.SetLevel(logrus.TraceLevel)
 	case "debug":
 		l.SetLevel(logrus.DebugLevel)
 	case "info":
