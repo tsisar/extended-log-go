@@ -4,3 +4,6 @@ vendor/
 
 # Binary
 extended-log-go
+
+# Log files
+data/

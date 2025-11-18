@@ -1,25 +1,25 @@
 package log
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable"
-	"github.com/sirupsen/logrus"
 )
 
-// TODO use native go logger
-
-var l = logrus.New()
+var logger *slog.Logger
 var location = time.Local
-
 var config Config
+var logLevel = new(slog.LevelVar)
 
+// Config holds the logging configuration.
 type Config struct {
 	save          string
 	level         string
@@ -43,81 +43,83 @@ func init() {
 		if days, err := strconv.Atoi(retentionStr); err == nil && days > 0 {
 			config.retentionDays = days
 		} else {
-			l.Warnf("Invalid LOG_RETENTION_DAYS value: %s. Using default: %d days", retentionStr, config.retentionDays)
+			fmt.Fprintf(os.Stderr, "Invalid LOG_RETENTION_DAYS value: %s. Using default: %d days\n", retentionStr, config.retentionDays)
 		}
 	}
 
-	// Colorful output for console
-	l.Out = colorable.NewColorableStdout()
+	// Set log level
 	setLogLevel()
-	l.SetFormatter(&customFormatter{
-		TextFormatter: logrus.TextFormatter{
-			FullTimestamp:          true,
-			TimestampFormat:        "02.01.2006 15:04:05.000",
-			ForceColors:            true,
-			DisableLevelTruncation: true,
-		},
-	})
-
-	// Add hook for saving logs to daily files without colors
-	if config.save == "true" {
-		l.AddHook(newDailyFileHook())
-	}
 
 	// Set timezone for log timestamps
 	if config.timezone != "" {
 		loc, err := time.LoadLocation(config.timezone)
 		if err != nil {
-			l.Warnf("Invalid LOG_TIMEZONE: %s. Falling back to local time.", err)
+			fmt.Fprintf(os.Stderr, "Invalid LOG_TIMEZONE: %s. Falling back to local time.\n", err)
 		} else {
 			location = loc
 		}
+	}
+
+	// Create handlers
+	consoleHandler := newConsoleHandler(os.Stdout)
+
+	if config.save == "true" {
+		fileHandler := newFileHandler(config.directory)
+		multiHandler := newMultiHandler(consoleHandler, fileHandler)
+		logger = slog.New(multiHandler)
+	} else {
+		logger = slog.New(consoleHandler)
 	}
 }
 
 // setLogLevel sets the logging level based on the LOG_LEVEL environment variable.
 func setLogLevel() {
 	switch config.level {
-	case "trace":
-		l.SetLevel(logrus.TraceLevel)
 	case "debug":
-		l.SetLevel(logrus.DebugLevel)
+		logLevel.Set(slog.LevelDebug)
 	case "info":
-		l.SetLevel(logrus.InfoLevel)
+		logLevel.Set(slog.LevelInfo)
 	case "warn":
-		l.SetLevel(logrus.WarnLevel)
+		logLevel.Set(slog.LevelWarn)
 	case "error":
-		l.SetLevel(logrus.ErrorLevel)
-	case "fatal":
-		l.SetLevel(logrus.FatalLevel)
-	case "panic":
-		l.SetLevel(logrus.PanicLevel)
+		logLevel.Set(slog.LevelError)
 	default:
-		l.SetLevel(logrus.TraceLevel)
+		logLevel.Set(slog.LevelDebug) // Default to debug (includes trace)
 	}
 }
 
-// customFormatter is a custom logrus formatter that adds colors to the log level.
-type customFormatter struct {
-	logrus.TextFormatter
+// ConsoleHandler is a custom slog handler that outputs colorful logs to the console.
+type ConsoleHandler struct {
+	w     io.Writer
+	level slog.Leveler
+	mu    sync.Mutex
 }
 
-// Format adds color to the log level and formats the log entry.
-func (f *customFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+func newConsoleHandler(w io.Writer) *ConsoleHandler {
+	return &ConsoleHandler{
+		w:     w,
+		level: logLevel,
+	}
+}
+
+func (h *ConsoleHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= h.level.Level()
+}
+
+func (h *ConsoleHandler) Handle(_ context.Context, r slog.Record) error {
 	var levelColor string
-	levelText := strings.ToUpper(entry.Level.String())
+	levelText := strings.ToUpper(r.Level.String())
 
 	// Set color for each log level
-	switch entry.Level {
-	case logrus.DebugLevel, logrus.TraceLevel:
-		levelColor = "" // No color for debug and trace
-	case logrus.WarnLevel:
+	switch r.Level {
+	case slog.LevelDebug:
+		levelColor = "" // No color for debug
+	case slog.LevelWarn:
 		levelColor = "\033[33m" // Yellow
-		levelText = "WARN"
-	case logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel:
+	case slog.LevelError:
 		levelColor = "\033[31m" // Red
 	default:
-		levelColor = "\033[36m" // Cyan
+		levelColor = "\033[36m" // Cyan (for info)
 	}
 
 	// Adjust level text length to 5 characters
@@ -126,99 +128,111 @@ func (f *customFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		levelText = fmt.Sprintf("%s%s\x1b[0m", levelColor, levelText)
 	}
 
-	formattedMessage := fmt.Sprintf("%s | %s | %s\n",
-		entry.Time.In(location).Format(f.TimestampFormat),
-		levelText,
-		entry.Message)
-	return []byte(formattedMessage), nil
-}
+	timestamp := r.Time.In(location).Format("02.01.2006 15:04:05.000")
+	message := fmt.Sprintf("%s | %s | %s\n", timestamp, levelText, r.Message)
 
-// newDailyFileHook creates a new logrus hook that writes logs to a daily file.
-func newDailyFileHook() *dailyFileHook {
-	hook := &dailyFileHook{
-		basePath: config.directory, // Directory for log files
-		formatter: &logrus.TextFormatter{ // Formatter without colors
-			FullTimestamp:          true,
-			TimestampFormat:        "02.01.2006 15:04:05.000",
-			ForceColors:            false,
-			DisableLevelTruncation: true,
-		},
-	}
-	hook.ensureLogFile()
-	return hook
-}
-
-// dailyFileHook is a logrus hook that writes logs to a daily file.
-type dailyFileHook struct {
-	basePath  string
-	file      *os.File
-	formatter logrus.Formatter
-}
-
-func (hook *dailyFileHook) Levels() []logrus.Level {
-	return logrus.AllLevels
-}
-
-func (hook *dailyFileHook) Fire(entry *logrus.Entry) error {
-	hook.ensureLogFile()
-
-	line, err := hook.formatter.Format(entry)
-	if err != nil {
-		return err
-	}
-
-	// Remove color codes from the log line before writing to the file
-	line = removeColorCodes(line)
-
-	_, err = hook.file.Write(line)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	_, err := h.w.Write([]byte(message))
 	return err
 }
 
+func (h *ConsoleHandler) WithAttrs(_ []slog.Attr) slog.Handler {
+	return h
+}
+
+func (h *ConsoleHandler) WithGroup(_ string) slog.Handler {
+	return h
+}
+
+// FileHandler is a custom slog handler that writes logs to daily files without colors.
+type FileHandler struct {
+	basePath string
+	file     *os.File
+	level    slog.Leveler
+	mu       sync.Mutex
+}
+
+func newFileHandler(basePath string) *FileHandler {
+	h := &FileHandler{
+		basePath: basePath,
+		level:    logLevel,
+	}
+	h.ensureLogFile()
+	return h
+}
+
+func (h *FileHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= h.level.Level()
+}
+
+func (h *FileHandler) Handle(_ context.Context, r slog.Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.ensureLogFile()
+
+	levelText := strings.ToUpper(r.Level.String())
+	levelText = fmt.Sprintf("%-5s", levelText)
+	timestamp := r.Time.In(location).Format("02.01.2006 15:04:05.000")
+	message := fmt.Sprintf("%s | %s | %s\n", timestamp, levelText, r.Message)
+
+	if h.file != nil {
+		_, err := h.file.Write([]byte(message))
+		return err
+	}
+	return nil
+}
+
+func (h *FileHandler) WithAttrs(_ []slog.Attr) slog.Handler {
+	return h
+}
+
+func (h *FileHandler) WithGroup(_ string) slog.Handler {
+	return h
+}
+
 // ensureLogFile ensures that the log file for the current day is open.
-func (hook *dailyFileHook) ensureLogFile() {
+func (h *FileHandler) ensureLogFile() {
 	now := time.Now().In(location)
-	fileName := filepath.Join(hook.basePath, now.Format("2006-01-02")+".log")
+	fileName := filepath.Join(h.basePath, now.Format("2006-01-02")+".log")
 
 	// Check if the file is already open and is current
-	if hook.file != nil {
-		stat, err := hook.file.Stat()
+	if h.file != nil {
+		stat, err := h.file.Stat()
 		if err == nil && stat.Name() == filepath.Base(fileName) {
 			return
 		}
-		err = hook.file.Close()
-		if err != nil {
-			return
-		}
+		h.file.Close()
 	}
 
 	// Ensure the log directory exists
-	if err := os.MkdirAll(hook.basePath, os.ModePerm); err != nil {
-		l.Errorf("Failed to create log directory %s: %v", hook.basePath, err)
+	if err := os.MkdirAll(h.basePath, os.ModePerm); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create log directory %s: %v\n", h.basePath, err)
 		return
 	}
 
 	// Clean up old log files
-	hook.cleanOldLogs()
+	h.cleanOldLogs()
 
 	// Open the file for writing
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		l.Errorf("Failed to open log file %s: %v", fileName, err)
+		fmt.Fprintf(os.Stderr, "Failed to open log file %s: %v\n", fileName, err)
 		return
 	}
 
-	hook.file = file
+	h.file = file
 }
 
 // cleanOldLogs removes log files older than the configured retention period.
-func (hook *dailyFileHook) cleanOldLogs() {
+func (h *FileHandler) cleanOldLogs() {
 	if config.retentionDays <= 0 {
 		return // Retention disabled
 	}
 
-	entries, err := os.ReadDir(hook.basePath)
+	entries, err := os.ReadDir(h.basePath)
 	if err != nil {
-		l.Debugf("Failed to read log directory for cleanup: %v", err)
 		return
 	}
 
@@ -244,14 +258,55 @@ func (hook *dailyFileHook) cleanOldLogs() {
 
 		// Remove file if it's older than retention period
 		if fileDate.Before(cutoffDate) {
-			filePath := filepath.Join(hook.basePath, name)
-			if err := os.Remove(filePath); err != nil {
-				l.Warnf("Failed to remove old log file %s: %v", filePath, err)
-			} else {
-				l.Debugf("Removed old log file: %s", name)
+			filePath := filepath.Join(h.basePath, name)
+			os.Remove(filePath)
+		}
+	}
+}
+
+// MultiHandler combines multiple handlers.
+type MultiHandler struct {
+	handlers []slog.Handler
+}
+
+func newMultiHandler(handlers ...slog.Handler) *MultiHandler {
+	return &MultiHandler{handlers: handlers}
+}
+
+func (h *MultiHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	for _, handler := range h.handlers {
+		if handler.Enabled(ctx, level) {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *MultiHandler) Handle(ctx context.Context, r slog.Record) error {
+	for _, handler := range h.handlers {
+		if handler.Enabled(ctx, r.Level) {
+			if err := handler.Handle(ctx, r); err != nil {
+				return err
 			}
 		}
 	}
+	return nil
+}
+
+func (h *MultiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	handlers := make([]slog.Handler, len(h.handlers))
+	for i, handler := range h.handlers {
+		handlers[i] = handler.WithAttrs(attrs)
+	}
+	return &MultiHandler{handlers: handlers}
+}
+
+func (h *MultiHandler) WithGroup(name string) slog.Handler {
+	handlers := make([]slog.Handler, len(h.handlers))
+	for i, handler := range h.handlers {
+		handlers[i] = handler.WithGroup(name)
+	}
+	return &MultiHandler{handlers: handlers}
 }
 
 // removeColorCodes removes ANSI color codes from a log line.
@@ -262,75 +317,77 @@ func removeColorCodes(line []byte) []byte {
 
 // Fatal logs a fatal message and exits the program.
 func Fatal(msg string) {
-	l.Fatal(msg)
+	logger.Error(msg)
+	os.Exit(1)
 }
 
 // Fatalf logs a formatted fatal message and exits the program.
 func Fatalf(format string, args ...interface{}) {
-	l.Fatalf(format, args...)
+	logger.Error(fmt.Sprintf(format, args...))
+	os.Exit(1)
 }
 
 // Error logs an error message.
 func Error(msg string) {
-	l.Error(msg)
+	logger.Error(msg)
 }
 
 // Errorf logs a formatted error message.
 func Errorf(format string, args ...interface{}) {
-	l.Errorf(format, args...)
+	logger.Error(fmt.Sprintf(format, args...))
 }
 
 // Errorln logs an error message with a newline character.
 func Errorln(args ...interface{}) {
-	l.Errorln(args...)
+	logger.Error(fmt.Sprint(args...))
 }
 
 // Warn logs a warning message.
 func Warn(msg string) {
-	l.Warn(msg)
+	logger.Warn(msg)
 }
 
 // Warnf logs a formatted warning message.
 func Warnf(format string, args ...interface{}) {
-	l.Warnf(format, args...)
+	logger.Warn(fmt.Sprintf(format, args...))
 }
 
 // Info logs an info message.
 func Info(msg string) {
-	l.Info(msg)
+	logger.Info(msg)
 }
 
 // Infof logs a formatted info message.
 func Infof(format string, args ...interface{}) {
-	l.Infof(format, args...)
+	logger.Info(fmt.Sprintf(format, args...))
 }
 
 // Debug logs a debug message.
 func Debug(msg string) {
-	l.Debug(msg)
+	logger.Debug(msg)
 }
 
 // Debugf logs a formatted debug message.
 func Debugf(format string, args ...interface{}) {
-	l.Debugf(format, args...)
+	logger.Debug(fmt.Sprintf(format, args...))
 }
 
-// Println logs a message with a newline character.
+// Println logs a message with info level.
 func Println(args ...interface{}) {
-	l.Println(args...)
+	logger.Info(fmt.Sprint(args...))
 }
 
-// Printf logs a formatted message.
+// Printf logs a formatted message with info level.
 func Printf(format string, args ...interface{}) {
-	l.Printf(format, args...)
+	logger.Info(fmt.Sprintf(format, args...))
 }
 
-// Trace logs a trace message.
+// Trace logs a trace message (using debug level in slog).
 func Trace(msg string) {
-	l.Trace(msg)
+	logger.Debug(msg)
 }
 
-// Tracef logs a formatted trace message.
+// Tracef logs a formatted trace message (using debug level in slog).
 func Tracef(format string, args ...interface{}) {
-	l.Tracef(format, args...)
+	logger.Debug(fmt.Sprintf(format, args...))
 }
