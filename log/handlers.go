@@ -127,12 +127,14 @@ func (h *FileHandler) ensureLogFile() {
 		if err == nil && stat.Name() == filepath.Base(fileName) {
 			return
 		}
-		h.file.Close()
+		if err := h.file.Close(); err != nil {
+			return
+		}
 	}
 
 	// Ensure the log directory exists
 	if err := os.MkdirAll(h.basePath, os.ModePerm); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create log directory %s: %v\n", h.basePath, err)
+		fprintf(os.Stderr, "Failed to create log directory %s: %v\n", h.basePath, err)
 		return
 	}
 
@@ -142,7 +144,7 @@ func (h *FileHandler) ensureLogFile() {
 	// Open the file for writing
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to open log file %s: %v\n", fileName, err)
+		fprintf(os.Stderr, "Failed to open log file %s: %v\n", fileName, err)
 		return
 	}
 
@@ -183,7 +185,9 @@ func (h *FileHandler) cleanOldLogs() {
 		// Remove file if it's older than retention period
 		if fileDate.Before(cutoffDate) {
 			filePath := filepath.Join(h.basePath, name)
-			os.Remove(filePath)
+			if err := os.Remove(filePath); err != nil {
+				fprintf(os.Stderr, "Failed to remove old log file %s: %v\n", filePath, err)
+			}
 		}
 	}
 }
@@ -232,4 +236,3 @@ func (h *MultiHandler) WithGroup(name string) slog.Handler {
 	}
 	return &MultiHandler{handlers: handlers}
 }
-

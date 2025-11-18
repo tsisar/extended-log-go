@@ -4,13 +4,13 @@ A lightweight, high-performance logging package for Go projects, built on top of
 
 ## Features
 
-- 🚀 **Zero Dependencies** - Uses only Go standard library (`log/slog`)
-- 🎨 **Colored Console Output** - Enhanced readability with color-coded log levels
-- 📁 **Daily Log Rotation** - Automatic file rotation with configurable retention
-- ⚙️ **Environment Configuration** - Easy setup via environment variables
-- 📊 **Fprintf API** - Full support for `fmt.Fprintf`-like logging with byte count
-- 🌍 **Timezone Support** - Configure timezone for log timestamps
-- 🔄 **Multiple Handlers** - Console and file logging simultaneously
+- **Zero Dependencies** - Uses only Go standard library (`log/slog`)
+- **Colored Console Output** - Enhanced readability with color-coded log levels
+- **Daily Log Rotation** - Automatic file rotation with configurable retention
+- **Environment Configuration** - Easy setup via environment variables
+- **Fprintf API** - Full support for `fmt.Fprintf`-like logging with byte count
+- **Timezone Support** - Configure timezone for log timestamps
+- **Multiple Handlers** - Console and file logging simultaneously
 
 ## Installation
 
@@ -145,7 +145,7 @@ When `LOG_SAVE=true`, logs are automatically:
 
 ## Dependencies
 
-**None!** 🎉
+**None!**
 
 This package uses only Go standard library:
 - `log/slog` - Structured logging

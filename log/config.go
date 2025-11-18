@@ -1,7 +1,6 @@
 package log
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
@@ -37,7 +36,7 @@ func init() {
 		if days, err := strconv.Atoi(retentionStr); err == nil && days > 0 {
 			config.retentionDays = days
 		} else {
-			fmt.Fprintf(os.Stderr, "Invalid LOG_RETENTION_DAYS value: %s. Using default: %d days\n", retentionStr, config.retentionDays)
+			fprintf(os.Stderr, "Invalid LOG_RETENTION_DAYS value: %s. Using default: %d days\n", retentionStr, config.retentionDays)
 		}
 	}
 
@@ -48,7 +47,7 @@ func init() {
 	if config.timezone != "" {
 		loc, err := time.LoadLocation(config.timezone)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Invalid LOG_TIMEZONE: %s. Falling back to local time.\n", err)
+			fprintf(os.Stderr, "Invalid LOG_TIMEZONE: %s. Falling back to local time.\n", err)
 		} else {
 			location = loc
 		}
