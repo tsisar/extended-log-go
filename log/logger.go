@@ -2,6 +2,7 @@ package log
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -80,4 +81,72 @@ func Trace(msg string) {
 // Tracef logs a formatted trace message (using debug level in slog).
 func Tracef(format string, args ...interface{}) {
 	logger.Debug(fmt.Sprintf(format, args...))
+}
+
+// Writer returns an io.Writer that writes to the logger at the specified level.
+type logWriter struct {
+	logFunc func(string)
+}
+
+func (w *logWriter) Write(p []byte) (n int, err error) {
+	w.logFunc(string(p))
+	return len(p), nil
+}
+
+// ErrorWriter returns an io.Writer that writes to the logger at error level.
+func ErrorWriter() io.Writer {
+	return &logWriter{logFunc: Error}
+}
+
+// WarnWriter returns an io.Writer that writes to the logger at warn level.
+func WarnWriter() io.Writer {
+	return &logWriter{logFunc: Warn}
+}
+
+// InfoWriter returns an io.Writer that writes to the logger at info level.
+func InfoWriter() io.Writer {
+	return &logWriter{logFunc: Info}
+}
+
+// DebugWriter returns an io.Writer that writes to the logger at debug level.
+func DebugWriter() io.Writer {
+	return &logWriter{logFunc: Debug}
+}
+
+// Fprintf formats according to a format specifier and writes to the logger at info level.
+// It returns the number of bytes written and any write error encountered.
+func Fprintf(w io.Writer, format string, args ...interface{}) (n int, err error) {
+	return fmt.Fprintf(w, format, args...)
+}
+
+// ErrorFprintf formats according to a format specifier and writes to the logger at error level.
+// It returns the number of bytes written and any write error encountered.
+func ErrorFprintf(format string, args ...interface{}) (n int, err error) {
+	msg := fmt.Sprintf(format, args...)
+	Error(msg)
+	return len(msg), nil
+}
+
+// WarnFprintf formats according to a format specifier and writes to the logger at warn level.
+// It returns the number of bytes written and any write error encountered.
+func WarnFprintf(format string, args ...interface{}) (n int, err error) {
+	msg := fmt.Sprintf(format, args...)
+	Warn(msg)
+	return len(msg), nil
+}
+
+// InfoFprintf formats according to a format specifier and writes to the logger at info level.
+// It returns the number of bytes written and any write error encountered.
+func InfoFprintf(format string, args ...interface{}) (n int, err error) {
+	msg := fmt.Sprintf(format, args...)
+	Info(msg)
+	return len(msg), nil
+}
+
+// DebugFprintf formats according to a format specifier and writes to the logger at debug level.
+// It returns the number of bytes written and any write error encountered.
+func DebugFprintf(format string, args ...interface{}) (n int, err error) {
+	msg := fmt.Sprintf(format, args...)
+	Debug(msg)
+	return len(msg), nil
 }

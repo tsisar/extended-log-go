@@ -36,6 +36,27 @@ func main() {
 	log.Errorf("Invalid configuration: %s is missing", "api_key")
 	log.Errorln("Connection", "timeout", "occurred")
 
+	// Fprintf examples - with return values
+	log.Println("\n=== Fprintf Examples (with byte count) ===")
+	
+	name, age := "Alice", 30
+	n, err := log.InfoFprintf("User %s is %d years old", name, age)
+	if err != nil {
+		log.Errorf("InfoFprintf error: %v", err)
+	}
+	log.Infof("%d bytes written to info log", n)
+
+	// Using Writer API with fmt.Fprintf
+	count, err := log.Fprintf(log.WarnWriter(), "Server load is at %d%%", 85)
+	if err != nil {
+		log.Errorf("Fprintf error: %v", err)
+	}
+	log.Infof("%d bytes written to warn log", count)
+
+	// Error with byte count
+	bytes, _ := log.ErrorFprintf("Database connection failed after %d retries", 3)
+	log.Debugf("Error log wrote %d bytes", bytes)
+
 	// Configuration examples
 	log.Println("\n=== Configuration Info ===")
 	log.Info("To configure logging, use these environment variables:")
