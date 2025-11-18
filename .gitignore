@@ -7,3 +7,6 @@ extended-log-go
 
 # Log files
 data/
+
+# Environment variables
+.env

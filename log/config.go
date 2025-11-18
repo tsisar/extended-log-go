@@ -1,9 +1,11 @@
 package log
 
 import (
+	"bufio"
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,7 +23,58 @@ type Config struct {
 	retentionDays int
 }
 
+// loadEnv loads environment variables from .env file if it exists.
+// This function parses simple KEY=VALUE pairs and ignores comments.
+func loadEnv(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		// .env file is optional, so we don't return error if it doesn't exist
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer func(file *os.File) {
+		_ = file.Close()
+	}(file)
+
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse KEY=VALUE
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue // Skip invalid lines
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		// Remove quotes if present
+		value = strings.Trim(value, `"'`)
+
+		// Set environment variable only if not already set
+		if os.Getenv(key) == "" {
+			_ = os.Setenv(key, value)
+		}
+	}
+
+	return scanner.Err()
+}
+
 func init() {
+	// Try to load .env file from current directory
+	err := loadEnv(".env")
+	if err == nil {
+		fprintf(os.Stderr, "Loaded .env file\n")
+	}
 	config.save = os.Getenv("LOG_SAVE")
 	config.level = os.Getenv("LOG_LEVEL")
 	config.timezone = os.Getenv("LOG_TIMEZONE")
