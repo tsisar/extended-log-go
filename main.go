@@ -36,27 +36,6 @@ func main() {
 	log.Errorf("Invalid configuration: %s is missing", "api_key")
 	log.Errorln("Connection", "timeout", "occurred")
 
-	// Fprintf examples - with return values
-	log.Println("\n=== Fprintf Examples (with byte count) ===")
-	
-	name, age := "Alice", 30
-	n, err := log.InfoFprintf("User %s is %d years old", name, age)
-	if err != nil {
-		log.Errorf("InfoFprintf error: %v", err)
-	}
-	log.Infof("%d bytes written to info log", n)
-
-	// Using Writer API with fmt.Fprintf
-	count, err := log.Fprintf(log.WarnWriter(), "Server load is at %d%%", 85)
-	if err != nil {
-		log.Errorf("Fprintf error: %v", err)
-	}
-	log.Infof("%d bytes written to warn log", count)
-
-	// Error with byte count
-	bytes, _ := log.ErrorFprintf("Database connection failed after %d retries", 3)
-	log.Debugf("Error log wrote %d bytes", bytes)
-
 	// Configuration examples
 	log.Println("\n=== Configuration Info ===")
 	log.Info("To configure logging, use these environment variables:")
@@ -65,6 +44,7 @@ func main() {
 	log.Info("  LOG_TIMEZONE=UTC       - set timezone for timestamps")
 	log.Info("  LOG_DIRECTORY=logs     - set custom directory for log files (default: data/logs)")
 	log.Info("  LOG_RETENTION_DAYS=30  - number of days to keep log files (default: 30)")
+	log.Info("  LOG_SHOW_CALLER=true   - show file:line where log was called")
 
 	log.Println("\n=== End of Examples ===")
 }

@@ -21,6 +21,7 @@ type Config struct {
 	timezone      string
 	directory     string
 	retentionDays int
+	showCaller    bool
 }
 
 // loadEnv loads environment variables from .env file if it exists.
@@ -71,10 +72,7 @@ func loadEnv(filename string) error {
 
 func init() {
 	// Try to load .env file from current directory
-	err := loadEnv(".env")
-	if err == nil {
-		fprintf(os.Stderr, "Loaded .env file\n")
-	}
+	_ = loadEnv(".env")
 	config.save = os.Getenv("LOG_SAVE")
 	config.level = os.Getenv("LOG_LEVEL")
 	config.timezone = os.Getenv("LOG_TIMEZONE")
@@ -82,6 +80,9 @@ func init() {
 	if config.directory == "" {
 		config.directory = "data/logs" // Default value
 	}
+
+	// Show caller information (file:line)
+	config.showCaller = os.Getenv("LOG_SHOW_CALLER") == "true"
 
 	// Parse retention days with default of 30 days
 	config.retentionDays = 30

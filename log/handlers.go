@@ -7,10 +7,23 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
+
+// getCaller returns the file and line number of the caller.
+// skip is the number of stack frames to skip (typically 4 for our logger functions).
+func getCaller(skip int) string {
+	_, file, line, ok := runtime.Caller(skip)
+	if !ok {
+		return "unknown:0"
+	}
+	// Get only the filename, not full path
+	file = filepath.Base(file)
+	return fmt.Sprintf("%s:%d", file, line)
+}
 
 // ConsoleHandler is a custom slog handler that outputs colorful logs to the console.
 type ConsoleHandler struct {
@@ -47,13 +60,20 @@ func (h *ConsoleHandler) Handle(_ context.Context, r slog.Record) error {
 	}
 
 	// Adjust level text length to 5 characters
-	levelText = fmt.Sprintf("%-5s", levelText)
+	levelText = fmt.Sprintf("%-4s", levelText)
 	if levelColor != "" {
 		levelText = fmt.Sprintf("%s%s\x1b[0m", levelColor, levelText)
 	}
 
 	timestamp := r.Time.In(location).Format("02.01.2006 15:04:05.000")
-	message := fmt.Sprintf("%s | %s | %s\n", timestamp, levelText, r.Message)
+
+	var message string
+	if config.showCaller {
+		caller := getCaller(6) // Skip: getCaller -> Handle -> slog -> public func -> user code
+		message = fmt.Sprintf("%s | %s | [%s] %s\n", timestamp, levelText, caller, r.Message)
+	} else {
+		message = fmt.Sprintf("%s | %s | %s\n", timestamp, levelText, r.Message)
+	}
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -97,9 +117,16 @@ func (h *FileHandler) Handle(_ context.Context, r slog.Record) error {
 	h.ensureLogFile()
 
 	levelText := strings.ToUpper(r.Level.String())
-	levelText = fmt.Sprintf("%-5s", levelText)
+	levelText = fmt.Sprintf("%-4s", levelText)
 	timestamp := r.Time.In(location).Format("02.01.2006 15:04:05.000")
-	message := fmt.Sprintf("%s | %s | %s\n", timestamp, levelText, r.Message)
+
+	var message string
+	if config.showCaller {
+		caller := getCaller(6) // Skip: getCaller -> Handle -> slog -> public func -> user code
+		message = fmt.Sprintf("%s | %s | [%s] %s\n", timestamp, levelText, caller, r.Message)
+	} else {
+		message = fmt.Sprintf("%s | %s | %s\n", timestamp, levelText, r.Message)
+	}
 
 	if h.file != nil {
 		_, err := h.file.Write([]byte(message))
