@@ -185,7 +185,10 @@ func (hook *dailyFileHook) ensureLogFile() {
 		if err == nil && stat.Name() == filepath.Base(fileName) {
 			return
 		}
-		hook.file.Close()
+		err = hook.file.Close()
+		if err != nil {
+			return
+		}
 	}
 
 	// Ensure the log directory exists
