@@ -43,6 +43,7 @@ func main() {
 	log.Info("  LOG_LEVEL=debug        - set log level (trace, debug, info, warn, error, fatal, panic)")
 	log.Info("  LOG_TIMEZONE=UTC       - set timezone for timestamps")
 	log.Info("  LOG_DIRECTORY=logs     - set custom directory for log files (default: data/logs)")
+	log.Info("  LOG_RETENTION_DAYS=30  - number of days to keep log files (default: 30)")
 
 	log.Println("\n=== End of Examples ===")
 }

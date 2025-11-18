@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TODO period for log rotation
 // TODO use native go logger
 
 var l = logrus.New()
@@ -21,10 +21,11 @@ var location = time.Local
 var config Config
 
 type Config struct {
-	save      string
-	level     string
-	timezone  string
-	directory string
+	save          string
+	level         string
+	timezone      string
+	directory     string
+	retentionDays int
 }
 
 func init() {
@@ -34,6 +35,16 @@ func init() {
 	config.directory = os.Getenv("LOG_DIRECTORY")
 	if config.directory == "" {
 		config.directory = "data/logs" // Default value
+	}
+
+	// Parse retention days with default of 30 days
+	config.retentionDays = 30
+	if retentionStr := os.Getenv("LOG_RETENTION_DAYS"); retentionStr != "" {
+		if days, err := strconv.Atoi(retentionStr); err == nil && days > 0 {
+			config.retentionDays = days
+		} else {
+			l.Warnf("Invalid LOG_RETENTION_DAYS value: %s. Using default: %d days", retentionStr, config.retentionDays)
+		}
 	}
 
 	// Colorful output for console
@@ -183,6 +194,9 @@ func (hook *dailyFileHook) ensureLogFile() {
 		return
 	}
 
+	// Clean up old log files
+	hook.cleanOldLogs()
+
 	// Open the file for writing
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
@@ -191,6 +205,50 @@ func (hook *dailyFileHook) ensureLogFile() {
 	}
 
 	hook.file = file
+}
+
+// cleanOldLogs removes log files older than the configured retention period.
+func (hook *dailyFileHook) cleanOldLogs() {
+	if config.retentionDays <= 0 {
+		return // Retention disabled
+	}
+
+	entries, err := os.ReadDir(hook.basePath)
+	if err != nil {
+		l.Debugf("Failed to read log directory for cleanup: %v", err)
+		return
+	}
+
+	cutoffDate := time.Now().In(location).AddDate(0, 0, -config.retentionDays)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		// Check if filename matches the log file pattern (YYYY-MM-DD.log)
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".log") {
+			continue
+		}
+
+		// Extract date from filename
+		dateStr := strings.TrimSuffix(name, ".log")
+		fileDate, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			continue // Skip files that don't match the date pattern
+		}
+
+		// Remove file if it's older than retention period
+		if fileDate.Before(cutoffDate) {
+			filePath := filepath.Join(hook.basePath, name)
+			if err := os.Remove(filePath); err != nil {
+				l.Warnf("Failed to remove old log file %s: %v", filePath, err)
+			} else {
+				l.Debugf("Removed old log file: %s", name)
+			}
+		}
+	}
 }
 
 // removeColorCodes removes ANSI color codes from a log line.
