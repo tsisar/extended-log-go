@@ -12,25 +12,29 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TODO Log directory
 // TODO period for log rotation
 // TODO use native go logger
 
 var l = logrus.New()
-var location *time.Location = time.Local
+var location = time.Local
 
 var config Config
 
 type Config struct {
-	save     string
-	level    string
-	timezone string
+	save      string
+	level     string
+	timezone  string
+	directory string
 }
 
 func init() {
 	config.save = os.Getenv("LOG_SAVE")
 	config.level = os.Getenv("LOG_LEVEL")
 	config.timezone = os.Getenv("LOG_TIMEZONE")
+	config.directory = os.Getenv("LOG_DIRECTORY")
+	if config.directory == "" {
+		config.directory = "data/logs" // Default value
+	}
 
 	// Colorful output for console
 	l.Out = colorable.NewColorableStdout()
@@ -78,7 +82,7 @@ func setLogLevel() {
 	case "panic":
 		l.SetLevel(logrus.PanicLevel)
 	default:
-		l.SetLevel(logrus.DebugLevel)
+		l.SetLevel(logrus.TraceLevel)
 	}
 }
 
@@ -121,7 +125,7 @@ func (f *customFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 // newDailyFileHook creates a new logrus hook that writes logs to a daily file.
 func newDailyFileHook() *dailyFileHook {
 	hook := &dailyFileHook{
-		basePath: "data/logs", // Directory for log files
+		basePath: config.directory, // Directory for log files
 		formatter: &logrus.TextFormatter{ // Formatter without colors
 			FullTimestamp:          true,
 			TimestampFormat:        "02.01.2006 15:04:05.000",
@@ -174,7 +178,10 @@ func (hook *dailyFileHook) ensureLogFile() {
 	}
 
 	// Ensure the log directory exists
-	os.MkdirAll(hook.basePath, os.ModePerm)
+	if err := os.MkdirAll(hook.basePath, os.ModePerm); err != nil {
+		l.Errorf("Failed to create log directory %s: %v", hook.basePath, err)
+		return
+	}
 
 	// Open the file for writing
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
