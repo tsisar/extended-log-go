@@ -88,22 +88,22 @@ LOG_SHOW_CALLER=true
 
 Console output (with colors):
 ```
-18.11.2025 11:04:17.250 | INFO | Application started
-18.11.2025 11:04:17.251 | WARN | Database connection slow
+18.11.2025 11:04:17.250 | INFO  | Application started
+18.11.2025 11:04:17.251 | WARN  | Database connection slow
 18.11.2025 11:04:17.252 | ERROR | Failed to connect
 ```
 
 With `LOG_SHOW_CALLER=true`:
 ```
-18.11.2025 11:04:17.250 | INFO | [main.go:25] Application started
-18.11.2025 11:04:17.251 | WARN | [main.go:30] Database connection slow
+18.11.2025 11:04:17.250 | INFO  | [main.go:25] Application started
+18.11.2025 11:04:17.251 | WARN  | [main.go:30] Database connection slow
 18.11.2025 11:04:17.252 | ERROR | [main.go:35] Failed to connect
 ```
 
 File output (without colors):
 ```
-18.11.2025 11:04:17.250 | INFO | Application started
-18.11.2025 11:04:17.251 | WARN | Database connection slow
+18.11.2025 11:04:17.250 | INFO  | Application started
+18.11.2025 11:04:17.251 | WARN  | Database connection slow
 18.11.2025 11:04:17.252 | ERROR | Failed to connect
 ```
 

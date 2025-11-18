@@ -60,7 +60,7 @@ func (h *ConsoleHandler) Handle(_ context.Context, r slog.Record) error {
 	}
 
 	// Adjust level text length to 5 characters
-	levelText = fmt.Sprintf("%-4s", levelText)
+	levelText = fmt.Sprintf("%-5s", levelText)
 	if levelColor != "" {
 		levelText = fmt.Sprintf("%s%s\x1b[0m", levelColor, levelText)
 	}
@@ -117,7 +117,7 @@ func (h *FileHandler) Handle(_ context.Context, r slog.Record) error {
 	h.ensureLogFile()
 
 	levelText := strings.ToUpper(r.Level.String())
-	levelText = fmt.Sprintf("%-4s", levelText)
+	levelText = fmt.Sprintf("%-5s", levelText)
 	timestamp := r.Time.In(location).Format("02.01.2006 15:04:05.000")
 
 	var message string
