@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+// LevelTrace is a custom log level below Debug for trace messages.
+const LevelTrace = slog.Level(-8)
+
 var logger *slog.Logger
 var location = time.Local
 var config Config
@@ -122,6 +125,8 @@ func init() {
 // setLogLevel sets the logging level based on the LOG_LEVEL environment variable.
 func setLogLevel() {
 	switch config.level {
+	case "trace":
+		logLevel.Set(LevelTrace)
 	case "debug":
 		logLevel.Set(slog.LevelDebug)
 	case "info":
@@ -131,6 +136,6 @@ func setLogLevel() {
 	case "error":
 		logLevel.Set(slog.LevelError)
 	default:
-		logLevel.Set(slog.LevelDebug) // Default to debug (includes trace)
+		logLevel.Set(LevelTrace) // Default to trace (includes all levels)
 	}
 }

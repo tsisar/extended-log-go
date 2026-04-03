@@ -1,6 +1,7 @@
 package log
 
 import (
+	"context"
 	"fmt"
 	"os"
 )
@@ -72,12 +73,12 @@ func Printf(format string, args ...interface{}) {
 	logger.Info(fmt.Sprintf(format, args...))
 }
 
-// Trace logs a trace message (using debug level in slog).
+// Trace logs a trace message.
 func Trace(msg string) {
-	logger.Debug(msg)
+	logger.Log(context.Background(), LevelTrace, msg)
 }
 
-// Tracef logs a formatted trace message (using debug level in slog).
+// Tracef logs a formatted trace message.
 func Tracef(format string, args ...interface{}) {
-	logger.Debug(fmt.Sprintf(format, args...))
+	logger.Log(context.Background(), LevelTrace, fmt.Sprintf(format, args...))
 }

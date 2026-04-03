@@ -45,18 +45,25 @@ func (h *ConsoleHandler) Enabled(_ context.Context, level slog.Level) bool {
 
 func (h *ConsoleHandler) Handle(_ context.Context, r slog.Record) error {
 	var levelColor string
-	levelText := strings.ToUpper(r.Level.String())
+	var levelText string
 
-	// Set color for each log level
-	switch r.Level {
-	case slog.LevelDebug:
+	// Set color and text for each log level
+	switch {
+	case r.Level < slog.LevelDebug:
+		levelText = "TRACE"
+		levelColor = "\033[90m" // Gray
+	case r.Level == slog.LevelDebug:
+		levelText = "DEBUG"
 		levelColor = "" // No color for debug
-	case slog.LevelWarn:
+	case r.Level == slog.LevelWarn:
+		levelText = "WARN"
 		levelColor = "\033[33m" // Yellow
-	case slog.LevelError:
+	case r.Level == slog.LevelError:
+		levelText = "ERROR"
 		levelColor = "\033[31m" // Red
 	default:
-		levelColor = "\033[36m" // Cyan (for info)
+		levelText = "INFO"
+		levelColor = "\033[36m" // Cyan
 	}
 
 	// Adjust level text length to 5 characters
@@ -116,7 +123,19 @@ func (h *FileHandler) Handle(_ context.Context, r slog.Record) error {
 
 	h.ensureLogFile()
 
-	levelText := strings.ToUpper(r.Level.String())
+	var levelText string
+	switch {
+	case r.Level < slog.LevelDebug:
+		levelText = "TRACE"
+	case r.Level == slog.LevelDebug:
+		levelText = "DEBUG"
+	case r.Level == slog.LevelWarn:
+		levelText = "WARN"
+	case r.Level == slog.LevelError:
+		levelText = "ERROR"
+	default:
+		levelText = "INFO"
+	}
 	levelText = fmt.Sprintf("%-5s", levelText)
 	timestamp := r.Time.In(location).Format("02.01.2006 15:04:05.000")
 
