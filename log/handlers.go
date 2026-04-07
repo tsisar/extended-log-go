@@ -13,16 +13,14 @@ import (
 	"time"
 )
 
-// getCaller returns the file and line number of the caller.
-// skip is the number of stack frames to skip (typically 4 for our logger functions).
-func getCaller(skip int) string {
-	_, file, line, ok := runtime.Caller(skip)
-	if !ok {
+// callerFromRecord extracts the file and line number from a slog.Record's PC.
+func callerFromRecord(r slog.Record) string {
+	fs := runtime.CallersFrames([]uintptr{r.PC})
+	f, _ := fs.Next()
+	if f.File == "" {
 		return "unknown:0"
 	}
-	// Get only the filename, not full path
-	file = filepath.Base(file)
-	return fmt.Sprintf("%s:%d", file, line)
+	return fmt.Sprintf("%s:%d", filepath.Base(f.File), f.Line)
 }
 
 // ConsoleHandler is a custom slog handler that outputs colorful logs to the console.
@@ -76,7 +74,7 @@ func (h *ConsoleHandler) Handle(_ context.Context, r slog.Record) error {
 
 	var message string
 	if config.showCaller {
-		caller := getCaller(6) // Skip: getCaller -> Handle -> slog -> public func -> user code
+		caller := callerFromRecord(r)
 		message = fmt.Sprintf("%s | %s | [%s] %s\n", timestamp, levelText, caller, r.Message)
 	} else {
 		message = fmt.Sprintf("%s | %s | %s\n", timestamp, levelText, r.Message)
@@ -141,7 +139,7 @@ func (h *FileHandler) Handle(_ context.Context, r slog.Record) error {
 
 	var message string
 	if config.showCaller {
-		caller := getCaller(6) // Skip: getCaller -> Handle -> slog -> public func -> user code
+		caller := callerFromRecord(r)
 		message = fmt.Sprintf("%s | %s | [%s] %s\n", timestamp, levelText, caller, r.Message)
 	} else {
 		message = fmt.Sprintf("%s | %s | %s\n", timestamp, levelText, r.Message)
